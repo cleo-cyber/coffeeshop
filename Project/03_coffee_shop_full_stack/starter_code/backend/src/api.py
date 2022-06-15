@@ -1,10 +1,12 @@
 import os
+from tkinter.font import BOLD
+from turtle import title
 from flask import Flask, request, jsonify, abort
 from sqlalchemy import exc
 import json
 from flask_cors import CORS
 
-from .database.models import db_drop_and_create_all, setup_db, Drink
+from .database.models import db_drop_and_create_all, setup_db, Drink,db
 from .auth.auth import AuthError, requires_auth
 
 app = Flask(__name__)
@@ -17,7 +19,7 @@ CORS(app)
 !! NOTE THIS MUST BE UNCOMMENTED ON FIRST RUN
 !! Running this funciton will add one
 '''
-# db_drop_and_create_all()
+db_drop_and_create_all()
 
 # ROUTES
 '''
@@ -29,6 +31,17 @@ CORS(app)
         or appropriate status code indicating reason for failure
 '''
 
+@app.route('/drinks')
+def get_drinks():
+    drinks=Drink.query.all()
+   
+    if len(drinks)<=0:
+            abort(404)
+    return jsonify({
+        'success':True,
+        'drinks':[drink.short() for drink in drinks]
+    })
+
 
 '''
 @TODO implement endpoint
@@ -38,7 +51,17 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
-
+@app.route('/drinks-detail')
+@requires_auth('get:drinks-detail')
+def drink_Detail(payload):
+    try:
+        drinks=Drink.query.all()
+        return jsonify({
+            'success':True,
+            'drinks':[drink.long() for drink in drinks]
+        })
+    except:
+        abort(404)
 
 '''
 @TODO implement endpoint
@@ -49,7 +72,36 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the newly created drink
         or appropriate status code indicating reason for failure
 '''
+@app.route('/drinks', methods=['POST'])
+@requires_auth('post:drinks')
+def post_drinks(payload):
+    body=request.get_json()
+    new_title=body.get('title',None)
+    new_recipe=body.get('recipe',None)
 
+    if new_title is None or new_recipe is None:
+        abort(422)
+    try:
+        #check if recipe is a dictionary object
+        if isinstance(new_recipe,dict):
+            new_recipe=[new_recipe]
+        new_drink=Drink(
+            title=new_title,
+            recipe=json.dumps(new_recipe)
+        )
+
+        new_drink.insert()
+
+       
+    except:
+        db.session.rollback()
+        abort(422)
+    finally:
+        # db.session.close()
+        return jsonify({
+        'success':True,
+        'drinks':[new_drink.long()]
+    })
 
 '''
 @TODO implement endpoint
@@ -62,7 +114,30 @@ CORS(app)
     returns status code 200 and json {"success": True, "drinks": drink} where drink an array containing only the updated drink
         or appropriate status code indicating reason for failure
 '''
+@app.route('/drinks/<int:drink_id>',methods=['PATCH'])
+@requires_auth('patch:drinks')
+def modify_drink(payload,drink_id):
+    drink=Drink.query.filter(Drink.id==drink_id).one_or_none()
+    if drink is None:
+        abort(404)
+    body=request.get_json()
+    update_title=body.get('title')
+    update_recipe=body.get('recipe')
+    try:
+        if update_title:
+            drink.title=update_title
+        if update_recipe:
+            if isinstance(update_recipe,dict):
+                update_recipe=[update_recipe]
 
+                drink.recipe=json.dumps(update_recipe)
+        drink.update()
+        return jsonify({
+            "success":True,
+            "drinks":[drink.long()]
+        })
+    except:
+        abort(404)
 
 '''
 @TODO implement endpoint
@@ -106,9 +181,22 @@ def unprocessable(error):
 @TODO implement error handler for 404
     error handler should conform to general task above
 '''
-
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        'success':False,
+        'error':404,
+        'message':'Not Found'
+    }),404
 
 '''
 @TODO implement error handler for AuthError
     error handler should conform to general task above
 '''
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({
+        "success":False,
+        'error':400,
+        'message':'Bad Request'
+    }),400
