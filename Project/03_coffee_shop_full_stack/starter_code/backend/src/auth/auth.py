@@ -37,7 +37,7 @@ class AuthError(Exception):
 
 
 def get_token_auth_header():
-    authentic = request.headers.get('Authorization')
+    authentic = request.headers.get("Authorization", None)
     if not authentic:
         raise AuthError({
             'code': 'Authorization header missing',
@@ -49,16 +49,12 @@ def get_token_auth_header():
             'code': 'Invalid header',
             'description': 'Authorization header must start with Bearer'
         })
-    elif len(split_header) == 1:
+    elif len(split_header) != 2:
         raise AuthError({
             'code': 'Invalid header',
             'description': 'Token not found'
         }, 401)
-    elif len(split_header)>2:
-        raise AuthError({
-            'code':'invalid header',
-            'description':'Authorization header must contain bearer and token'
-        })
+  
     token = split_header[1]
     return token
 

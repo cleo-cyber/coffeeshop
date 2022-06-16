@@ -51,15 +51,16 @@ def get_drinks():
     returns status code 200 and json {"success": True, "drinks": drinks} where drinks is the list of drinks
         or appropriate status code indicating reason for failure
 '''
-@app.route('/drinks-detail')
+@app.route('/drinks-detail', methods=['GET'])
 @requires_auth('get:drinks-detail')
-def drink_Detail(payload):
+def get_drink_detail(payload):
     try:
-        drinks=Drink.query.all()
+        drinks = Drink.query.all()
+
         return jsonify({
-            'success':True,
-            'drinks':[drink.long() for drink in drinks]
-        })
+            'success': True,
+            'drinks': [drink.long() for drink in drinks]
+        }), 200
     except:
         abort(404)
 
@@ -91,18 +92,17 @@ def post_drinks(payload):
         )
 
         new_drink.insert()
+        return jsonify({
+            'success':True,
+            'drinks':[new_drink.long()]
+        })
 
        
     except:
         db.session.rollback()
         abort(422)
-    finally:
-        # db.session.close()
-        return jsonify({
-        'success':True,
-        'drinks':[new_drink.long()]
-    })
-
+ 
+     
 '''
 @TODO implement endpoint
     PATCH /drinks/<id>
@@ -133,9 +133,9 @@ def modify_drink(payload,drink_id):
                 drink.recipe=json.dumps(update_recipe)
         drink.update()
         return jsonify({
-            "success":True,
-            "drinks":[drink.long()]
-        })
+                "success":True,
+                "drinks":[drink.long()]
+            })
     except:
         abort(404)
 
@@ -149,7 +149,17 @@ def modify_drink(payload,drink_id):
     returns status code 200 and json {"success": True, "delete": id} where id is the id of the deleted record
         or appropriate status code indicating reason for failure
 '''
-
+@app.route('/drinks/<int:drink_id>', methods=['DELETE'])
+@requires_auth('delete:drinks')
+def delete_drink(jwt,drink_id):
+    drink=Drink.query.filter(Drink.id==drink_id).one_or_none()
+    if drink is None:
+        abort(404)
+    drink.delete()
+    return jsonify({
+        "success":True,
+        "deleted":drink_id
+    })
 
 # Error Handling
 '''
@@ -176,8 +186,10 @@ def unprocessable(error):
                     }), 404
 
 '''
+#right one
 
 '''
+
 @TODO implement error handler for 404
     error handler should conform to general task above
 '''
