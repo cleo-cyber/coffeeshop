@@ -99,7 +99,7 @@ def post_drinks(payload):
 
        
     except:
-        db.session.rollback()
+        # db.session.rollback()
         abort(422)
     finally:
         db.session.close()
